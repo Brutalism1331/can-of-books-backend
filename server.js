@@ -1,32 +1,25 @@
 'use strict';
 
-require('dotenv').config();
+// imports and required installs.
 const express = require('express');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const jwksClient = require('jwks-rsa');
 const app = express();
-const PORT = process.env.PORT || 3001;
-const mongoose = require('mongoose');
+const cors = require('cors');
 app.use(cors());
+const BookModel = require('./models/books.js');
+require('dotenv').config();
+const jwksClient = require('jwks-rsa');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const PORT = process.env.PORT || 3001;
 
-const bookSchema = new mongoose.Schema({
-  title: { type: String, required: true },
-  description: { type: String },
-  status: { type: String },
-  email: { type: String },
-})
-
-const BookModel = mongoose.model('books', bookSchema);
-
-
-
+// JWT token for Auth.
+// All of this came from jsonwebtoken docs and will be EXACTLY THE SAME
 const { response } = require('express');
 var client = jwksClient({
-
+  // Make sure you have your unique dev-key.
   jwksUri: 'https://dev-9elj7pr7.us.auth0.com/.well-known/jwks.json'
 });
-
+//Part of JWT token for Auth.
 function getKey(header, callback) {
   console.log(header);
   client.getSigningKey(header.kid, function (err, key) {
@@ -34,66 +27,17 @@ function getKey(header, callback) {
     var signingKey = key.publicKey || key.rsaPublicKey;
     callback(null, signingKey);
   });
-}
+};
 
-app.get('/', (req, res) => {
-  res.send('Hello Human');
-});
-
-app.get('/test', (req, res) => {
-
-  const token = req.headers.authorization.split(' ')[1];
-
-  jwt.verify(token, getKey, {}, function (err, user) {
-    if (err) {
-      res.status(500).send('inValid token');
-    }
-    res.send(user);
-  });
-});
-
-app.get('/books', async (req, res) => {
-
+// Functions.
+async function clear() {
   try {
-    let booksDb = await BookModel.find({});
-    res.status(200).send(booksDb);
+    await BookModel.deleteMany({});
+    console.log('Bombed the DBase');
   } catch (err) {
-    console.log(err);
-    res.status(500).send('data base error');
-  }
-});
-
-mongoose.connect('mongodb://localhost:27018/books', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-  .then(async () => {
-    console.log('connected to database');
-
-    let books = await BookModel.find({});
-    if (books.length === 0) {
-      await addBook({
-        title: "Brutalism, Volume 1",
-        description: "A story of life, Overcoming challenges and The lessons learned",
-        status: "Still being written",
-        email: "Brutalism.1331@gmail.com",
-      });
-      await addBook({
-        title: "Brutalism, Volume 2",
-        description: "A story of life, Overcoming challenges and The lessons learned",
-        status: "Still being written",
-        email: "Brutalism.1331@gmail.com",
-      });
-      await addBook({
-        title: "Brutalism, Volume 3",
-        description: "A story of life, Overcoming challenges and The lessons learned",
-        status: "Still being written",
-        email: "Brutalism.1331@gmail.com",
-      });
-    };
-  });
-
-app.listen(PORT, () => console.log(`listening on ${PORT}`));
+    console.log('Error in clearing database');
+  };
+};
 
 async function addBook(obj) {
 
@@ -101,16 +45,77 @@ async function addBook(obj) {
   return await newBook.save();
 };
 
-async function clear() {
+// Routs.
+app.get('/', (req, res) => {
+  res.send('Hello Human');
+});
+// Use to clear dBase.
+app.get('/clear', clear);
+
+// Use this to seed the dBase.
+app.get('/seed', seed);
+
+// Books from dBase rout.
+app.get('/books', (req, res) => {
+  console.log(req.headers);
   try {
-    await BookModel.deleteMany({});
-    console.log('Bombed the DBase');
+    const token = req.headers.authorization.split(' ')[1];
 
-  }
-  catch (err) {
-    console.log('Error in clearing database');
+    // JWT token Auth
+    jwt.verify(token, getKey, {}, function (err, user) {
+      if (err) { // If we have a JWT verification error.
+        res.status(500).send('inValid token');
+      } else {
+        BookModel.find((err, dataBaseResults) => {
+          if (err) { // If we can't access our dBase.
+            res.send('can\'t access DB');
+          } else {
+            res.status(200).send(dataBaseResults);
+            console.log(dataBaseResults)
+          };
+        });
+      }
+    });
+  } catch (err) {
+    res.status(500).send(err);
+  };
+});
 
+// Connect to dBase
+mongoose.connect('mongodb://localhost:27018/books', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+
+}).then(async () => {
+  console.log('connected to database');
+});
+
+app.listen(3001, () => {
+  console.log('Server up on 3001');
+});
+
+
+async function seed(req, res) {
+
+  let books = await BookModel.find({});
+  if (books.length === 0) {
+    await addBook({
+      title: "Brutalism, Volume 1",
+      description: "A story of life, Overcoming challenges and The lessons learned",
+      status: "Still being written",
+      email: "Brutalism.1331@gmail.com",
+    });
+    await addBook({
+      title: "Brutalism, Volume 2",
+      description: "A story of life, Overcoming challenges and The lessons learned",
+      status: "Still being written",
+      email: "Brutalism.1331@gmail.com",
+    });
+    await addBook({
+      title: "Brutalism, Volume 3",
+      description: "A story of life, Overcoming challenges and The lessons learned",
+      status: "Still being written",
+      email: "Brutalism.1331@gmail.com",
+    });
   };
 };
-
-clear()
