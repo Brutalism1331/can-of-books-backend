@@ -29,22 +29,6 @@ function getKey(header, callback) {
   });
 };
 
-// Functions.
-async function clear() {
-  try {
-    await BookModel.deleteMany({});
-    console.log('Bombed the DBase');
-  } catch (err) {
-    console.log('Error in clearing database');
-  };
-};
-
-async function addBook(obj) {
-
-  let newBook = new BookModel(obj);
-  return await newBook.save();
-};
-
 // Routs.
 app.get('/', (req, res) => {
   res.send('Hello Human');
@@ -81,22 +65,39 @@ app.get('/books', (req, res) => {
   };
 });
 
-// Connect to dBase
-mongoose.connect('mongodb://localhost:27018/books', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-
-}).then(async () => {
-  console.log('connected to database');
-});
-
 app.listen(3001, () => {
   console.log('Server up on 3001');
 });
 
+// Connect to dBase
+mongoose.connect('mongodb://localhost:27017/books', {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+
+}).then( () => {
+  console.log('connected to database');
+});
+
+// Functions.
+// How do i send a response instead of a console.log so that the page isn't stuck loading?
+async function clear(req, res) {
+  try {
+    await BookModel.deleteMany({});
+    res.status(200).send('Cleared')
+    console.log('Bombed the DBase');
+  } catch (err) {
+    console.log('Error in clearing database');
+  };
+};
+
+async function addBook(obj) {
+
+  let newBook = new BookModel(obj);
+  return await newBook.save();
+};
 
 async function seed(req, res) {
-
+  console.log('seeding the db');
   let books = await BookModel.find({});
   if (books.length === 0) {
     await addBook({
